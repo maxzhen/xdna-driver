@@ -94,7 +94,7 @@ int amdxdna_hwctx_walk(struct amdxdna_client *client, void *arg,
 
 void *amdxdna_cmd_get_payload(struct amdxdna_gem_obj *abo, u32 *size)
 {
-	struct amdxdna_cmd *cmd = abo->mem.kva;
+	struct amdxdna_cmd *cmd = amdxdna_gem_vmap(abo);
 	u32 num_masks, count;
 
 	if (amdxdna_cmd_get_op(abo) == ERT_CMD_CHAIN)
@@ -118,7 +118,7 @@ void *amdxdna_cmd_get_payload(struct amdxdna_gem_obj *abo, u32 *size)
 
 u32 amdxdna_cmd_get_cu_idx(struct amdxdna_gem_obj *abo)
 {
-	struct amdxdna_cmd *cmd = abo->mem.kva;
+	struct amdxdna_cmd *cmd = amdxdna_gem_vmap(abo);
 	u32 num_masks, i;
 	u32 *cu_mask;
 
@@ -140,7 +140,7 @@ int amdxdna_cmd_set_error(struct amdxdna_gem_obj *abo,
 			  enum ert_cmd_state error_state)
 {
 	struct amdxdna_client *client = job->hwctx->client;
-	struct amdxdna_cmd *cmd = abo->mem.kva;
+	struct amdxdna_cmd *cmd = amdxdna_gem_vmap(abo);
 	struct amdxdna_cmd_chain *cc = NULL;
 
 	cmd->header &= ~AMDXDNA_CMD_STATE;
@@ -152,7 +152,7 @@ int amdxdna_cmd_set_error(struct amdxdna_gem_obj *abo,
 		abo = amdxdna_gem_get_obj(client, cc->data[0], AMDXDNA_BO_CMD);
 		if (!abo)
 			return -EINVAL;
-		cmd = abo->mem.kva;
+		cmd = amdxdna_gem_vmap(abo);
 	}
 
 	memset(cmd->data, 0xff, abo->mem.size - sizeof(*cmd));

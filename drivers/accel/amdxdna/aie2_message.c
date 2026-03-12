@@ -553,10 +553,10 @@ int aie2_config_cu(struct amdxdna_hwctx *hwctx,
 		}
 
 		req.cfgs[i] = FIELD_PREP(AIE2_MSG_CFG_CU_PDI_ADDR,
-					 abo->mem.dev_addr >> shift);
+					 amdxdna_gem_dev_addr(abo) >> shift);
 		req.cfgs[i] |= FIELD_PREP(AIE2_MSG_CFG_CU_FUNC, cu->cu_func);
 		XDNA_DBG(xdna, "CU %d full addr 0x%llx, cfg 0x%x", i,
-			 abo->mem.dev_addr, req.cfgs[i]);
+			 amdxdna_gem_dev_addr(abo), req.cfgs[i]);
 		drm_gem_object_put(gobj);
 	}
 	req.num_cus = hwctx->cus->num_cus;
@@ -1032,7 +1032,7 @@ int aie2_cmdlist_multi_execbuf(struct amdxdna_hwctx *hwctx,
 		}
 
 		size = cmdbuf_abo->mem.size - offset;
-		ret = aie2_cmdlist_fill_slot(cmdbuf_abo->mem.kva + offset,
+		ret = aie2_cmdlist_fill_slot(amdxdna_gem_vmap(cmdbuf_abo) + offset,
 					     abo, &size, &op);
 		amdxdna_gem_put_obj(abo);
 		if (ret)
@@ -1045,9 +1045,9 @@ int aie2_cmdlist_multi_execbuf(struct amdxdna_hwctx *hwctx,
 		return -EOPNOTSUPP;
 
 	/* The offset is the accumulated total size of the cmd buffer */
-	EXEC_MSG_OPS(xdna)->init_chain_req(&req, cmdbuf_abo->mem.dev_addr,
+	EXEC_MSG_OPS(xdna)->init_chain_req(&req, amdxdna_gem_dev_addr(cmdbuf_abo),
 					   offset, payload->command_count);
-	drm_clflush_virt_range(cmdbuf_abo->mem.kva, offset);
+	drm_clflush_virt_range(amdxdna_gem_vmap(cmdbuf_abo), offset);
 
 	msg.handle = job;
 	msg.notify_cb = notify_cb;
@@ -1077,7 +1077,7 @@ int aie2_cmdlist_single_execbuf(struct amdxdna_hwctx *hwctx,
 	int ret;
 
 	size = cmdbuf_abo->mem.size;
-	ret = aie2_cmdlist_fill_slot(cmdbuf_abo->mem.kva, cmd_abo, &size, &op);
+	ret = aie2_cmdlist_fill_slot(amdxdna_gem_vmap(cmdbuf_abo), cmd_abo, &size, &op);
 	if (ret)
 		return ret;
 
@@ -1085,9 +1085,9 @@ int aie2_cmdlist_single_execbuf(struct amdxdna_hwctx *hwctx,
 	if (msg.opcode == MSG_OP_MAX_OPCODE)
 		return -EOPNOTSUPP;
 
-	EXEC_MSG_OPS(xdna)->init_chain_req(&req, cmdbuf_abo->mem.dev_addr,
+	EXEC_MSG_OPS(xdna)->init_chain_req(&req, amdxdna_gem_dev_addr(cmdbuf_abo),
 					   size, 1);
-	drm_clflush_virt_range(cmdbuf_abo->mem.kva, size);
+	drm_clflush_virt_range(amdxdna_gem_vmap(cmdbuf_abo), size);
 
 	msg.handle = job;
 	msg.notify_cb = notify_cb;
@@ -1113,7 +1113,7 @@ int aie2_sync_bo(struct amdxdna_hwctx *hwctx, struct amdxdna_sched_job *job,
 	int ret = 0;
 
 	req.src_addr = 0;
-	req.dst_addr = amdxdna_dev_bo_offset(abo);
+	req.dst_addr = 0;
 	req.size = abo->mem.size;
 
 	/* Device to Host */
