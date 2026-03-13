@@ -1025,7 +1025,7 @@ int aie2_cmdlist_multi_execbuf(struct amdxdna_hwctx *hwctx,
 		u32 boh = (u32)(payload->data[i]);
 		struct amdxdna_gem_obj *abo;
 
-		abo = amdxdna_gem_get_obj(client, boh, AMDXDNA_BO_CMD);
+		abo = amdxdna_gem_get_obj(client, boh, AMDXDNA_BO_SHARE);
 		if (!abo) {
 			XDNA_ERR(xdna, "Failed to find cmd BO %d", boh);
 			return -ENOENT;

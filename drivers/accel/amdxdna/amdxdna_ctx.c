@@ -149,7 +149,7 @@ int amdxdna_cmd_set_error(struct amdxdna_gem_obj *abo,
 	if (amdxdna_cmd_get_op(abo) == ERT_CMD_CHAIN) {
 		cc = amdxdna_cmd_get_payload(abo, NULL);
 		cc->error_index = (cmd_idx < cc->command_count) ? cmd_idx : 0;
-		abo = amdxdna_gem_get_obj(client, cc->data[0], AMDXDNA_BO_CMD);
+		abo = amdxdna_gem_get_obj(client, cc->data[0], AMDXDNA_BO_SHARE);
 		if (!abo)
 			return -EINVAL;
 		cmd = amdxdna_gem_vmap(abo);
@@ -468,7 +468,7 @@ int amdxdna_cmd_submit(struct amdxdna_client *client,
 	job->drv_cmd = drv_cmd;
 
 	if (cmd_bo_hdl != AMDXDNA_INVALID_BO_HANDLE) {
-		job->cmd_bo = amdxdna_gem_get_obj(client, cmd_bo_hdl, AMDXDNA_BO_CMD);
+		job->cmd_bo = amdxdna_gem_get_obj(client, cmd_bo_hdl, AMDXDNA_BO_SHARE);
 		if (!job->cmd_bo) {
 			XDNA_ERR(xdna, "Failed to get cmd bo from %d", cmd_bo_hdl);
 			ret = -EINVAL;

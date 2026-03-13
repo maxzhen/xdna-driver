@@ -41,7 +41,7 @@ struct amdxdna_gem_obj {
 	struct amdxdna_client		*client;
 	u8				type;
 	bool				pinned;
-	struct mutex			lock; /* Protects: pinned, mem._kva */
+	struct mutex			lock; /* Protects: pinned, mem.kva */
 	struct amdxdna_mem		mem;
 
 	/* Below members are initialized when needed */

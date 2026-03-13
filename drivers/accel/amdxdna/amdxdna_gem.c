@@ -639,7 +639,6 @@ static struct amdxdna_gem_obj *
 amdxdna_gem_create_ubuf_object(struct drm_device *dev, struct amdxdna_drm_create_bo *args)
 {
 	struct amdxdna_dev *xdna = to_xdna_dev(dev);
-	enum amdxdna_ubuf_flag flags = 0;
 	struct amdxdna_drm_va_tbl va_tbl;
 	struct drm_gem_object *gobj;
 	struct dma_buf *dma_buf;
@@ -650,10 +649,7 @@ amdxdna_gem_create_ubuf_object(struct drm_device *dev, struct amdxdna_drm_create
 	}
 
 	if (va_tbl.num_entries) {
-		if (args->type == AMDXDNA_BO_CMD)
-			flags |= AMDXDNA_UBUF_FLAG_MAP_DMA;
-
-		dma_buf = amdxdna_get_ubuf(dev, flags, va_tbl.num_entries,
+		dma_buf = amdxdna_get_ubuf(dev, va_tbl.num_entries,
 					   u64_to_user_ptr(args->vaddr + sizeof(va_tbl)));
 	} else {
 		dma_buf = dma_buf_get(va_tbl.dmabuf_fd);
@@ -706,6 +702,7 @@ amdxdna_gem_prime_import(struct drm_device *dev, struct dma_buf *dma_buf)
 	abo->attach = attach;
 	abo->dma_buf = dma_buf;
 	abo->type = AMDXDNA_BO_SHMEM;
+	gobj->resv = dma_buf->resv;
 
 	return gobj;
 
