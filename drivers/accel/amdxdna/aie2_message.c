@@ -1003,6 +1003,7 @@ int aie2_cmdlist_multi_execbuf(struct amdxdna_hwctx *hwctx,
 	struct mailbox_channel *chann = hwctx->priv->mbox_chann;
 	struct amdxdna_client *client = hwctx->client;
 	struct amdxdna_gem_obj *cmd_abo = job->cmd_bo;
+	void *cmd_buf = amdxdna_gem_vmap(cmdbuf_abo);
 	struct amdxdna_dev *xdna = client->xdna;
 	struct amdxdna_cmd_chain *payload;
 	struct xdna_mailbox_msg msg;
@@ -1010,18 +1011,21 @@ int aie2_cmdlist_multi_execbuf(struct amdxdna_hwctx *hwctx,
 	u32 payload_len;
 	u32 offset = 0;
 	size_t size;
+	u32 ccnt;
 	int ret;
 	u32 op;
 	u32 i;
 
 	op = amdxdna_cmd_get_op(cmd_abo);
 	payload = amdxdna_cmd_get_payload(cmd_abo, &payload_len);
-	if (op != ERT_CMD_CHAIN || !payload ||
-	    payload_len < struct_size(payload, data, payload->command_count))
+	if (!payload)
+		return -EINVAL;
+	ccnt = payload->command_count;
+	if (op != ERT_CMD_CHAIN || payload_len < struct_size(payload, data, ccnt))
 		return -EINVAL;
 
 	op = ERT_INVALID_CMD;
-	for (i = 0; i < payload->command_count; i++) {
+	for (i = 0; i < ccnt; i++) {
 		u32 boh = (u32)(payload->data[i]);
 		struct amdxdna_gem_obj *abo;
 
@@ -1032,22 +1036,24 @@ int aie2_cmdlist_multi_execbuf(struct amdxdna_hwctx *hwctx,
 		}
 
 		size = cmdbuf_abo->mem.size - offset;
-		ret = aie2_cmdlist_fill_slot(amdxdna_gem_vmap(cmdbuf_abo) + offset,
-					     abo, &size, &op);
+		ret = aie2_cmdlist_fill_slot(cmd_buf + offset, abo, &size, &op);
 		amdxdna_gem_put_obj(abo);
 		if (ret)
 			return ret;
 
 		offset += size;
 	}
+	XDNA_DBG(client->xdna, "Total %d commands:", ccnt);
+	print_hex_dump_debug("cmdbufs: ", DUMP_PREFIX_OFFSET, 16, 4, cmd_buf, offset, false);
+
 	msg.opcode = EXEC_MSG_OPS(xdna)->get_chain_msg_op(op);
 	if (msg.opcode == MSG_OP_MAX_OPCODE)
 		return -EOPNOTSUPP;
 
 	/* The offset is the accumulated total size of the cmd buffer */
 	EXEC_MSG_OPS(xdna)->init_chain_req(&req, amdxdna_gem_dev_addr(cmdbuf_abo),
-					   offset, payload->command_count);
-	drm_clflush_virt_range(amdxdna_gem_vmap(cmdbuf_abo), offset);
+					   offset, ccnt);
+	drm_clflush_virt_range(cmd_buf, offset);
 
 	msg.handle = job;
 	msg.notify_cb = notify_cb;
@@ -1058,6 +1064,8 @@ int aie2_cmdlist_multi_execbuf(struct amdxdna_hwctx *hwctx,
 		XDNA_ERR(xdna, "Send message failed");
 		return ret;
 	}
+	print_hex_dump_debug("cmdlist msg: ", DUMP_PREFIX_OFFSET, 16, 4,
+			     &req, msg.send_size, false);
 
 	return 0;
 }
@@ -1070,24 +1078,29 @@ int aie2_cmdlist_single_execbuf(struct amdxdna_hwctx *hwctx,
 	struct mailbox_channel *chann = hwctx->priv->mbox_chann;
 	struct amdxdna_dev *xdna = hwctx->client->xdna;
 	struct amdxdna_gem_obj *cmd_abo = job->cmd_bo;
+	void *cmd_buf = amdxdna_gem_vmap(cmdbuf_abo);
 	struct xdna_mailbox_msg msg;
 	union exec_chain_req req;
 	u32 op = ERT_INVALID_CMD;
+	u64 dev_addr;
 	size_t size;
 	int ret;
 
 	size = cmdbuf_abo->mem.size;
-	ret = aie2_cmdlist_fill_slot(amdxdna_gem_vmap(cmdbuf_abo), cmd_abo, &size, &op);
+	ret = aie2_cmdlist_fill_slot(cmd_buf, cmd_abo, &size, &op);
 	if (ret)
 		return ret;
+
+	print_hex_dump_debug("cmdbuf: ", DUMP_PREFIX_OFFSET, 16, 4,
+			     amdxdna_gem_vmap(cmdbuf_abo), size, false);
 
 	msg.opcode = EXEC_MSG_OPS(xdna)->get_chain_msg_op(op);
 	if (msg.opcode == MSG_OP_MAX_OPCODE)
 		return -EOPNOTSUPP;
 
-	EXEC_MSG_OPS(xdna)->init_chain_req(&req, amdxdna_gem_dev_addr(cmdbuf_abo),
-					   size, 1);
-	drm_clflush_virt_range(amdxdna_gem_vmap(cmdbuf_abo), size);
+	dev_addr = amdxdna_gem_dev_addr(cmdbuf_abo);
+	EXEC_MSG_OPS(xdna)->init_chain_req(&req, dev_addr, size, 1);
+	drm_clflush_virt_range(cmd_buf, size);
 
 	msg.handle = job;
 	msg.notify_cb = notify_cb;
@@ -1098,6 +1111,9 @@ int aie2_cmdlist_single_execbuf(struct amdxdna_hwctx *hwctx,
 		XDNA_ERR(hwctx->client->xdna, "Send message failed");
 		return ret;
 	}
+
+	print_hex_dump_debug("cmdlist msg: ", DUMP_PREFIX_OFFSET, 16, 4,
+			     &req, msg.send_size, false);
 
 	return 0;
 }

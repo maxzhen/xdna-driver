@@ -221,6 +221,9 @@ check_again:
 			goto check_again;
 	}
 
+	print_hex_dump_debug("req data: ", DUMP_PREFIX_OFFSET, 16, 4, &mb_msg->pkg,
+			     mb_msg->pkg_size, false);
+
 	write_addr = mb_chann->mb->res.ringbuf_base + start_addr + tail;
 	memcpy_toio(write_addr, &mb_msg->pkg, mb_msg->pkg_size);
 	mailbox_set_tailptr(mb_chann, tail + mb_msg->pkg_size);
