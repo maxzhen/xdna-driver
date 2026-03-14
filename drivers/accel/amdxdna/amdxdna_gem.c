@@ -179,7 +179,7 @@ u64 amdxdna_gem_uva(struct amdxdna_gem_obj *abo)
 {
 	if (abo->type == AMDXDNA_BO_DEV) {
 		struct amdxdna_gem_obj *heap = abo->client->dev_heap;
-		u64 off = amdxdna_gem_dev_addr(abo) - amdxdna_gem_dev_addr(heap);
+		u64 off = amdxdna_dev_bo_offset(abo);
 
 		if (amdxdna_gem_uva(heap) != AMDXDNA_INVALID_ADDR)
 			return amdxdna_gem_uva(heap) + off;
@@ -198,9 +198,7 @@ u64 amdxdna_gem_dev_addr(struct amdxdna_gem_obj *abo)
 		return abo->client->xdna->dev_info->dev_mem_base;
 	if (abo->type == AMDXDNA_BO_DEV)
 		return abo->mm_node.start;
-	if (amdxdna_pasid_on(abo->client))
-		return amdxdna_gem_uva(abo);
-	return abo->mem.dma_addr;
+	return amdxdna_obj_dma_addr(abo);
 }
 
 static bool amdxdna_hmm_invalidate(struct mmu_interval_notifier *mni,

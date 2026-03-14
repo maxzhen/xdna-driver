@@ -72,7 +72,7 @@ static int aie2_hwctx_restart(struct amdxdna_dev *xdna, struct amdxdna_hwctx *hw
 	}
 
 	ret = aie2_map_host_buf(xdna->dev_handle, hwctx->fw_ctx_id,
-				amdxdna_gem_dev_addr(heap),
+				amdxdna_obj_dma_addr(heap),
 				heap->mem.size);
 	if (ret) {
 		XDNA_ERR(xdna, "Map host buf failed, ret %d", ret);
@@ -653,7 +653,7 @@ int aie2_hwctx_init(struct amdxdna_hwctx *hwctx)
 	}
 
 	ret = aie2_map_host_buf(xdna->dev_handle, hwctx->fw_ctx_id,
-				amdxdna_gem_dev_addr(heap),
+				amdxdna_obj_dma_addr(heap),
 				heap->mem.size);
 	if (ret) {
 		XDNA_ERR(xdna, "Map host buffer failed, ret %d", ret);

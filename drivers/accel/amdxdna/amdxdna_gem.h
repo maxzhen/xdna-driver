@@ -67,6 +67,18 @@ static inline void amdxdna_gem_put_obj(struct amdxdna_gem_obj *abo)
 	drm_gem_object_put(to_gobj(abo));
 }
 
+void *amdxdna_gem_vmap(struct amdxdna_gem_obj *abo);
+u64 amdxdna_gem_uva(struct amdxdna_gem_obj *abo);
+u64 amdxdna_gem_dev_addr(struct amdxdna_gem_obj *abo);
+static inline u64 amdxdna_dev_bo_offset(struct amdxdna_gem_obj *abo)
+{
+	return amdxdna_gem_dev_addr(abo) - amdxdna_gem_dev_addr(abo->client->dev_heap);
+}
+static inline u64 amdxdna_obj_dma_addr(struct amdxdna_gem_obj *abo)
+{
+	return amdxdna_pasid_on(abo->client) ? amdxdna_gem_uva(abo) : abo->mem.dma_addr;
+}
+
 void amdxdna_umap_put(struct amdxdna_umap *mapp);
 
 struct drm_gem_object *
@@ -84,13 +96,5 @@ void amdxdna_gem_unpin(struct amdxdna_gem_obj *abo);
 int amdxdna_drm_create_bo_ioctl(struct drm_device *dev, void *data, struct drm_file *filp);
 int amdxdna_drm_get_bo_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp);
 int amdxdna_drm_sync_bo_ioctl(struct drm_device *dev, void *data, struct drm_file *filp);
-
-void *amdxdna_gem_vmap(struct amdxdna_gem_obj *abo);
-u64 amdxdna_gem_uva(struct amdxdna_gem_obj *abo);
-u64 amdxdna_gem_dev_addr(struct amdxdna_gem_obj *abo);
-static inline u64 amdxdna_dev_bo_offset(struct amdxdna_gem_obj *abo)
-{
-	return amdxdna_gem_dev_addr(abo) - amdxdna_gem_dev_addr(abo->client->dev_heap);
-}
 
 #endif /* _AMDXDNA_GEM_H_ */
