@@ -21,6 +21,7 @@ enum class drv_ioctl_cmd {
   destroy_ctx,
   config_ctx_cu_config,
   config_ctx_debug_bo,
+  config_ctx_auto_coredump,
 
   create_bo,
   create_uptr_bo,
@@ -83,6 +84,11 @@ struct config_ctx_debug_bo_arg {
   uint32_t ctx_handle;
   bool is_detach;
   bo_id bo;
+};
+
+struct config_ctx_auto_coredump_arg {
+  uint32_t ctx_handle;
+  bool enabled;
 };
 
 struct bo_info {
@@ -251,6 +257,10 @@ private:
 
   virtual void
   config_ctx_debug_bo(config_ctx_debug_bo_arg& arg) const
+  { shim_not_supported_err(__func__); }
+
+  virtual void
+  config_ctx_auto_coredump(config_ctx_auto_coredump_arg& arg) const
   { shim_not_supported_err(__func__); }
 
   virtual void

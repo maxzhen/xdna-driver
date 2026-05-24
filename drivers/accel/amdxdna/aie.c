@@ -295,6 +295,21 @@ struct amdxdna_tile_rw_walk_arg {
 	u8 __user					*buf;
 };
 
+/* On all existing platforms, coredump data buf size is the same. */
+static inline size_t amdxdna_coredump_data_buf_size(void)
+{
+	return SZ_1M;
+}
+
+static size_t amdxdna_coredump_total_buf_size(struct aie_device *aie,
+					      struct amdxdna_hwctx *hwctx)
+{
+	u32 orig_col = hwctx->num_col - hwctx->num_unused_col;
+	u32 num_bufs = aie->metadata.rows * orig_col;
+
+	return (size_t)num_bufs * amdxdna_coredump_data_buf_size();
+}
+
 static bool amdxdna_get_coredump_filter(struct amdxdna_hwctx *hwctx, void *arg)
 {
 	struct amdxdna_coredump_walk_arg *wa = arg;
@@ -302,42 +317,29 @@ static bool amdxdna_get_coredump_filter(struct amdxdna_hwctx *hwctx, void *arg)
 	return hwctx->client->pid == wa->pid && hwctx->id == wa->ctx_id;
 }
 
-static int amdxdna_get_coredump_cb(struct amdxdna_hwctx *hwctx, void *arg)
+char *amdxdna_get_hwctx_coredump(struct aie_device *aie, struct amdxdna_hwctx *hwctx)
 {
+	size_t total_size = amdxdna_coredump_total_buf_size(aie, hwctx);
+	size_t data_buf_size = amdxdna_coredump_data_buf_size();
 	struct amdxdna_dev *xdna = hwctx->client->xdna;
 	struct amdxdna_msg_buf_hdl **data_hdls = NULL;
 	struct amdxdna_msg_buf_hdl *list_hdl = NULL;
 	struct amdxdna_coredump_buf_entry *buf_list;
-	struct amdxdna_coredump_walk_arg *wa = arg;
-	size_t data_buf_size = SZ_1M;
-	size_t offset = 0;
-	size_t total_size;
 	int ret = 0, i;
+	size_t offset;
 	u32 num_bufs;
-	u32 orig_col;
+	char *buf;
 
-	if (!amdxdna_client_visible(hwctx->client)) {
-		XDNA_ERR(xdna, "Permission denied for context %u", wa->ctx_id);
-		return -EPERM;
-	}
+	buf = kvzalloc_objs(*buf, total_size);
+	if (!buf)
+		return ERR_PTR(-ENOMEM);
 
-	orig_col = hwctx->num_col - hwctx->num_unused_col;
-	num_bufs = wa->aie->metadata.rows * orig_col;
-	total_size = (size_t)num_bufs * data_buf_size;
-
-	if (wa->buf_size < total_size) {
-		XDNA_DBG(xdna, "Insufficient buffer size %zu, need %zu",
-			 wa->buf_size, total_size);
-		wa->args->element_size = total_size;
-		ret = -ENOSPC;
-		goto out;
-	}
-
+	num_bufs = total_size / data_buf_size;
 	list_hdl = amdxdna_alloc_msg_buff(xdna, num_bufs * sizeof(*buf_list));
 	if (IS_ERR(list_hdl)) {
-		XDNA_ERR(xdna, "Failed to allocate buffer list");
 		ret = PTR_ERR(list_hdl);
 		list_hdl = NULL;
+		XDNA_ERR(xdna, "Failed to allocate buffer list: %d", ret);
 		goto out;
 	}
 
@@ -347,16 +349,16 @@ static int amdxdna_get_coredump_cb(struct amdxdna_hwctx *hwctx, void *arg)
 	data_hdls = kzalloc_objs(*data_hdls, num_bufs);
 	if (!data_hdls) {
 		ret = -ENOMEM;
-		goto free_list_hdl;
+		goto out;
 	}
 
 	for (i = 0; i < num_bufs; i++) {
 		data_hdls[i] = amdxdna_alloc_msg_buff(xdna, data_buf_size);
 		if (IS_ERR(data_hdls[i])) {
-			XDNA_ERR(xdna, "Failed to allocate data buffer %d", i);
 			ret = PTR_ERR(data_hdls[i]);
 			data_hdls[i] = NULL;
-			goto free_data_hdls;
+			XDNA_ERR(xdna, "Failed to allocate data buffer %d: %d", i, ret);
+			goto out;
 		}
 
 		memset(to_cpu_addr(data_hdls[i], 0), 0, to_buf_size(data_hdls[i]));
@@ -368,30 +370,57 @@ static int amdxdna_get_coredump_cb(struct amdxdna_hwctx *hwctx, void *arg)
 
 	drm_clflush_virt_range(buf_list, to_buf_size(list_hdl));
 
-	ret = wa->aie->msg_ops.get_coredump(hwctx, list_hdl, num_bufs);
+	ret = aie->msg_ops.get_coredump(hwctx, list_hdl, num_bufs);
 	if (ret) {
-		XDNA_ERR(xdna, "Failed to get coredump from firmware, ret=%d",
-			 ret);
-		goto free_data_hdls;
+		XDNA_ERR(xdna, "Failed to get coredump from firmware: %d", ret);
+		goto out;
 	}
 
-	for (i = 0; i < num_bufs; i++) {
-		if (copy_to_user(wa->buf + offset, to_cpu_addr(data_hdls[i], 0),
-				 data_buf_size)) {
-			ret = -EFAULT;
-			goto free_data_hdls;
-		}
-		offset += data_buf_size;
-	}
+	for (i = 0, offset = 0; i < num_bufs; i++, offset += data_buf_size)
+		memcpy(buf + offset, to_cpu_addr(data_hdls[i], 0), data_buf_size);
 
-free_data_hdls:
+out:
 	for (i = 0; i < num_bufs; i++)
 		amdxdna_free_msg_buff(data_hdls[i]);
 	kfree(data_hdls);
-free_list_hdl:
 	amdxdna_free_msg_buff(list_hdl);
-out:
-	return ret;
+	if (!ret)
+		return buf;
+
+	kvfree(buf);
+	return ERR_PTR(ret);
+}
+
+static int amdxdna_get_coredump_cb(struct amdxdna_hwctx *hwctx, void *arg)
+{
+	struct amdxdna_dev *xdna = hwctx->client->xdna;
+	struct amdxdna_coredump_walk_arg *wa = arg;
+	size_t total_size;
+	char *buf;
+	int ret;
+
+	if (!amdxdna_client_visible(hwctx->client)) {
+		XDNA_ERR(xdna, "Permission denied for context %u", wa->ctx_id);
+		return -EPERM;
+	}
+
+	total_size = amdxdna_coredump_total_buf_size(wa->aie, hwctx);
+	if (wa->buf_size < total_size) {
+		XDNA_DBG(xdna, "Insufficient buffer size %zu, need %zu",
+			 wa->buf_size, total_size);
+		wa->args->element_size = total_size;
+		return -ENOSPC;
+	}
+
+	buf = amdxdna_get_hwctx_coredump(wa->aie, hwctx);
+	if (IS_ERR(buf))
+		return PTR_ERR(buf);
+	ret = copy_to_user(wa->buf, buf, total_size);
+	kvfree(buf);
+	if (ret)
+		return -EFAULT;
+
+	return 0;
 }
 
 int amdxdna_get_coredump(struct aie_device *aie,
@@ -820,5 +849,85 @@ int amdxdna_aie_tile_write(struct aie_device *aie,
 	if (ret == -ENOENT)
 		XDNA_ERR(xdna, "Context %u for pid %llu not found",
 			 access.context_id, access.pid);
+	return ret;
+}
+
+static bool amdxdna_auto_coredump_filter(struct amdxdna_hwctx *hwctx, void *arg)
+{
+	return hwctx->auto_coredump;
+}
+
+int
+amdxdna_set_auto_coredump_mode(struct amdxdna_client *client,
+			       struct amdxdna_drm_set_state *args)
+{
+	struct amdxdna_drm_attribute_state state = {};
+	struct amdxdna_dev *xdna = client->xdna;
+	struct amdxdna_client *tmp_client;
+	u32 buf_sz;
+	int ret;
+
+	drm_WARN_ON(&xdna->ddev, !mutex_is_locked(&xdna->dev_lock));
+
+	buf_sz = min(args->buffer_size, sizeof(state));
+	if (copy_from_user(&state, u64_to_user_ptr(args->buffer), buf_sz))
+		return -EFAULT;
+
+	if (state.state > 1)
+		return -EINVAL;
+
+	if (XDNA_MBZ_DBG(client->xdna, state.pad, sizeof(state.pad)))
+		return -EINVAL;
+
+	XDNA_INFO(xdna, "Setting auto coredump to %d", state.state);
+
+	if (state.state) {
+		xdna->auto_coredump = true;
+		return 0;
+	}
+
+	amdxdna_for_each_client(xdna, tmp_client) {
+		ret = amdxdna_hwctx_walk(tmp_client, NULL, amdxdna_auto_coredump_filter, NULL);
+		if (ret != -ENOENT)
+			break;
+	}
+	if (ret != -ENOENT) {
+		XDNA_ERR(xdna, "Can't disable auto core dump when it's enabled on some hwctxs");
+		return -EBUSY;
+	}
+	xdna->auto_coredump = false;
+	return 0;
+}
+
+int
+amdxdna_get_auto_coredump_mode(struct amdxdna_client *client,
+			       struct amdxdna_drm_get_info *args)
+{
+	struct amdxdna_drm_attribute_state state = {};
+	struct amdxdna_dev *xdna = client->xdna;
+	u32 buf_sz;
+
+	state.state = xdna->auto_coredump;
+	buf_sz = min(args->buffer_size, sizeof(state));
+	if (copy_to_user(u64_to_user_ptr(args->buffer), &state, buf_sz))
+		return -EFAULT;
+
+	return 0;
+}
+
+int
+amdxdna_hwctx_enable_auto_coredump(struct amdxdna_hwctx *hwctx)
+{
+	struct amdxdna_dev *xdna = hwctx->client->xdna;
+	int ret = 0;
+
+	drm_WARN_ON(&xdna->ddev, !mutex_is_locked(&xdna->dev_lock));
+
+	if (xdna->auto_coredump) {
+		hwctx->auto_coredump = true;
+	} else {
+		ret = -EINVAL;
+		XDNA_ERR(xdna, "Auto core dump is not enabled on device");
+	}
 	return ret;
 }

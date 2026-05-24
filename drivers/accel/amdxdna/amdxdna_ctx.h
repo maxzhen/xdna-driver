@@ -118,6 +118,9 @@ struct amdxdna_hwctx {
 
 	atomic64_t			job_submit_cnt;
 	atomic64_t			job_free_cnt ____cacheline_aligned_in_smp;
+
+	/* Enable auto core dump after timeout. */
+	bool				auto_coredump;
 };
 
 #define drm_job_to_xdna_job(j) \

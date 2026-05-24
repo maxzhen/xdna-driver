@@ -222,6 +222,7 @@ struct amdxdna_drm_config_hwctx {
 #define DRM_AMDXDNA_HWCTX_ASSIGN_DBG_BUF	1
 #define DRM_AMDXDNA_HWCTX_REMOVE_DBG_BUF	2
 #define DRM_AMDXDNA_HWCTX_CONFIG_OPCODE_TIMEOUT	3
+#define DRM_AMDXDNA_HWCTX_CONFIG_AUTO_COREDUMP	4
 	__u32 param_type;
 	__u64 param_val;
 	__u32 param_val_size;
@@ -626,6 +627,7 @@ struct amdxdna_drm_get_info {
 #define	DRM_AMDXDNA_QUERY_RESOURCE_INFO			12
 #define	DRM_AMDXDNA_GET_FRAME_BOUNDARY_PREEMPT_STATE	13
 #define	DRM_AMDXDNA_QUERY_CERT_FIRMWARE_VERSION		14
+#define	DRM_AMDXDNA_GET_AUTO_COREDUMP			15
 	__u32 param; /* in */
 	__u32 buffer_size; /* in/out */
 	__u64 buffer; /* in/out */
@@ -878,6 +880,7 @@ struct amdxdna_drm_set_state {
 #define	DRM_AMDXDNA_SET_FW_TRACE_STATE		6
 #define	DRM_AMDXDNA_AIE_TILE_WRITE		7
 #define	DRM_AMDXDNA_SET_CLOCK_FREQ		8
+#define	DRM_AMDXDNA_SET_AUTO_COREDUMP		9
 	__u32 param; /* in */
 	__u32 buffer_size; /* in */
 	__u64 buffer; /* in */

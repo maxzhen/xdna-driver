@@ -143,6 +143,17 @@ config_ctx_debug_bo(config_ctx_debug_bo_arg& ctx_arg) const
   ioctl(dev_fd(), DRM_IOCTL_AMDXDNA_CONFIG_HWCTX, &arg);
 }
 
+void
+platform_drv_host::
+config_ctx_auto_coredump(config_ctx_auto_coredump_arg& ctx_arg) const
+{
+  amdxdna_drm_config_hwctx arg = {};
+  arg.handle = ctx_arg.ctx_handle;
+  arg.param_type = DRM_AMDXDNA_HWCTX_CONFIG_AUTO_COREDUMP;
+  arg.param_val = ctx_arg.enabled;
+  ioctl(dev_fd(), DRM_IOCTL_AMDXDNA_CONFIG_HWCTX, &arg);
+}
+
 std::pair<uint64_t, uint64_t>
 platform_drv_host::
 get_bo_info(uint32_t boh) const

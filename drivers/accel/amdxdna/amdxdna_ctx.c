@@ -96,7 +96,7 @@ static void amdxdna_hwctx_destroy_rcu(struct amdxdna_hwctx *hwctx,
 
 /*
  * Walks @client's hwctxs invoking @walk. If @filter is set, @walk runs
- * only on the matching hwctx; returns -ENOENT if none matched.
+ * only on the fist matching hwctx; returns -ENOENT if none matched.
  * Otherwise @walk runs on every hwctx; halts on the first non-zero return.
  */
 int amdxdna_hwctx_walk(struct amdxdna_client *client, void *arg,
@@ -112,7 +112,8 @@ int amdxdna_hwctx_walk(struct amdxdna_client *client, void *arg,
 	amdxdna_for_each_hwctx(client, hwctx_id, hwctx) {
 		if (filter && !filter(hwctx, arg))
 			continue;
-		ret = walk(hwctx, arg);
+		if (walk)
+			ret = walk(hwctx, arg);
 		if (filter)
 			break;
 		if (ret)
@@ -384,6 +385,7 @@ int amdxdna_drm_config_hwctx_ioctl(struct drm_device *dev, void *data, struct dr
 		break;
 	case DRM_AMDXDNA_HWCTX_ASSIGN_DBG_BUF:
 	case DRM_AMDXDNA_HWCTX_REMOVE_DBG_BUF:
+	case DRM_AMDXDNA_HWCTX_CONFIG_AUTO_COREDUMP:
 		/* For those types that param_val is a value */
 		buf = NULL;
 		buf_size = 0;

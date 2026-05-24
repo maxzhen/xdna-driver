@@ -1003,6 +1003,8 @@ int aie2_hwctx_config(struct amdxdna_hwctx *hwctx, u32 type, u64 value, void *bu
 		return aie2_hwctx_cfg_debug_bo(hwctx, (u32)value, true);
 	case DRM_AMDXDNA_HWCTX_REMOVE_DBG_BUF:
 		return aie2_hwctx_cfg_debug_bo(hwctx, (u32)value, false);
+	case DRM_AMDXDNA_HWCTX_CONFIG_AUTO_COREDUMP:
+		return amdxdna_hwctx_enable_auto_coredump(hwctx);
 	default:
 		XDNA_DBG(xdna, "Not supported type %d", type);
 		return -EOPNOTSUPP;
