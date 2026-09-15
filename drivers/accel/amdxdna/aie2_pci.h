@@ -85,7 +85,6 @@ struct amdxdna_hwctx_priv {
 	struct mutex			io_lock; /* protect seq and cmd order */
 	u64				seq;
 	struct semaphore		job_sem;
-	bool				job_done;
 
 	/* Completed job counter */
 	u64				completed;

@@ -241,8 +241,6 @@ union amdxdna_job_priv {
 	struct {
 		/* The fence to signal DRM scheduler that job is done */
 		struct dma_fence	*fence;
-		/* user can wait on this fence */
-		struct dma_fence	*out_fence;
 	} aie2;
 	/* aie4 kernel submission: queue linkage + job state */
 	struct {
@@ -256,7 +254,6 @@ struct amdxdna_sched_job {
 	struct kref		refcnt;
 	struct amdxdna_hwctx	*hwctx;
 	struct mm_struct	*mm;
-	bool			job_done;
 	bool			job_timeout;
 	u64			seq;
 	struct amdxdna_drv_cmd	*drv_cmd;
@@ -267,7 +264,6 @@ struct amdxdna_sched_job {
 };
 
 #define aie2_job_fence     priv.aie2.fence
-#define aie2_job_out_fence priv.aie2.out_fence
 #define aie4_job_list      priv.aie4.list
 #define aie4_job_state     priv.aie4.state
 

@@ -81,7 +81,6 @@ static int aie2_tdr_stop_hwctx(struct amdxdna_hwctx *hwctx, void *arg)
 	struct amdxdna_dev_hdl *ndev = xdna->dev_handle;
 	struct app_health_report *report = NULL;
 	struct drm_gpu_scheduler *sched;
-	struct drm_sched_job *s_job;
 	int ret;
 
 	report = kzalloc_obj(*report);
@@ -103,27 +102,11 @@ static int aie2_tdr_stop_hwctx(struct amdxdna_hwctx *hwctx, void *arg)
 		}
 	}
 
+	kfree(hwctx->priv->cached_health);
+	hwctx->priv->cached_health = report;
+
 	sched = &hwctx->priv->sched;
 	drm_sched_stop(sched, NULL);
-	/*
-	 * On older kernels (before 6.17), drm_sched_entity
-	 * exposes the pending_list directly for each scheduler.
-	 * It is safe to access sched->pending_list here as the
-	 * list remains available and visible outside the DRM core.
-	 * Newer kernels may encapsulate or change this, but for
-	 * legacy compatibility, this direct access is intentional.
-	 */
-	s_job = list_first_entry_or_null(&sched->pending_list, struct drm_sched_job, list);
-	if (s_job && report) {
-		struct amdxdna_sched_job *job;
-
-		job = drm_job_to_xdna_job(s_job);
-		job->job_timeout = true;
-		hwctx->priv->cached_health = report;
-		report = NULL;
-	}
-
-	kfree(report);
 
 	aie2_destroy_context(ndev, hwctx);
 #ifdef HAVE_6_13_drm_sched_start_errno
