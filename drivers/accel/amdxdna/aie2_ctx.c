@@ -842,8 +842,6 @@ void aie2_hwctx_fini(struct amdxdna_hwctx *hwctx)
 
 	XDNA_DBG(xdna, "%s sequence number %lld", hwctx->name, hwctx->priv->seq);
 	aie2_hwctx_job_unpause(hwctx);
-	aie2_hwctx_wait_for_idle(hwctx);
-
 	/* Request fw to destroy hwctx and cancel the rest pending requests */
 	aie2_release_resource(hwctx);
 
@@ -852,7 +850,6 @@ void aie2_hwctx_fini(struct amdxdna_hwctx *hwctx)
 	wait_event(hwctx->job_free_wq,
 		   atomic64_read(&hwctx->job_submit_cnt) ==
 		   atomic64_read(&hwctx->job_free_cnt));
-	mutex_lock(&xdna->dev_lock);
 
 	aie2_ctx_syncobj_destroy(hwctx);
 
@@ -866,13 +863,13 @@ void aie2_hwctx_fini(struct amdxdna_hwctx *hwctx)
 	}
 	amdxdna_gem_unpin(hwctx->priv->heap);
 	drm_gem_object_put(to_gobj(hwctx->priv->heap));
-
 	kfree(hwctx->priv->cached_health);
 	mutex_destroy(&hwctx->priv->io_lock);
 	aie2_hwctx_put_cu_bos(hwctx);
 	kfree(hwctx->col_list);
 	kfree(hwctx->priv);
 	kfree(hwctx->cus);
+	mutex_lock(&xdna->dev_lock);
 }
 
 static int aie2_config_cu_resp_handler(void *handle, void __iomem *data, size_t size)

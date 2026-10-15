@@ -155,8 +155,11 @@ static void amdxdna_client_cleanup(struct amdxdna_client *client)
 	struct amdxdna_dev *xdna = client->xdna;
 	unsigned long heap_id;
 
+	mutex_lock(&xdna->dev_lock);
 	list_del(&client->node);
 	amdxdna_hwctx_remove_all(client);
+	mutex_unlock(&xdna->dev_lock);
+
 	xa_destroy(&client->hwctx_xa);
 	cleanup_srcu_struct(&client->hwctx_srcu);
 
@@ -203,9 +206,7 @@ static void amdxdna_drm_close(struct drm_device *ddev, struct drm_file *filp)
 	}
 
 	mutex_lock(&xdna->client_lock);
-	mutex_lock(&xdna->dev_lock);
 	amdxdna_client_cleanup(client);
-	mutex_unlock(&xdna->dev_lock);
 	mutex_unlock(&xdna->client_lock);
 
 	if (pm_held)

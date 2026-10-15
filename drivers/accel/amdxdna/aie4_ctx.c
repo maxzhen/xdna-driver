@@ -725,6 +725,7 @@ destroy_lock:
 void aie4_hwctx_fini(struct amdxdna_hwctx *hwctx)
 {
 	struct amdxdna_hwctx_priv *priv = hwctx->priv;
+	struct amdxdna_dev *xdna = hwctx->client->xdna;
 
 	/*
 	 * ERROR sets has_reset (like a TDR reset) so the worker drains the running
@@ -734,6 +735,8 @@ void aie4_hwctx_fini(struct amdxdna_hwctx *hwctx)
 	 * queue is torn down.
 	 */
 	aie4_hwctx_destroy(hwctx, AIE4_HWCTX_ERROR);
+
+	mutex_unlock(&xdna->dev_lock);
 	if (priv->kernel_submit) {
 		aie4_hwctx_wait_for_running(hwctx);
 		destroy_workqueue(priv->job_work_q);
@@ -741,6 +744,7 @@ void aie4_hwctx_fini(struct amdxdna_hwctx *hwctx)
 	aie4_hwctx_umq_fini(hwctx);
 	mutex_destroy(&priv->io_lock);
 	kfree(priv);
+	mutex_lock(&xdna->dev_lock);
 }
 
 static inline bool valid_queue_index(u64 read, u64 write, u32 capacity)
